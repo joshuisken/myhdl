@@ -428,7 +428,7 @@ def _writeTestBench(f, intf, trace=False):
     fr = StringIO()
     to = StringIO()
     pm = StringIO()
-    for portname in intf.argnames:
+    for portname in sorted(intf.argnames):
         s = intf.argdict[portname]
         r = _getRangeString(s)
         if s._driven:
@@ -437,7 +437,7 @@ def _writeTestBench(f, intf, trace=False):
         else:
             print("reg %s%s;" % (r, portname), file=f)
             print("        %s," % portname, file=fr)
-        print("    %s," % portname, file=pm)
+        print("    .%s(%s)," % (portname, portname), file=pm)
     print(file=f)
     print("initial begin", file=f)
     if trace:
