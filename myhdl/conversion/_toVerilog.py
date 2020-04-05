@@ -108,6 +108,7 @@ class _ToVerilogConvertor(object):
                  "no_testbench",
                  "portmap",
                  "trace",
+                 "tb_initcode",
                  "initial_values"
                  )
 
@@ -122,6 +123,7 @@ class _ToVerilogConvertor(object):
         self.no_myhdl_header = False
         self.no_testbench = False
         self.trace = False
+        self.tb_initcode = False
         self.initial_values = False
 
     def __call__(self, func, *args, **kwargs):
@@ -204,7 +206,7 @@ class _ToVerilogConvertor(object):
         if len(intf.argnames) > 0 and not toVerilog.no_testbench:
             tbpath = os.path.join(directory, "tb_" + vfilename)
             tbfile = open(tbpath, 'w')
-            _writeTestBench(tbfile, intf, self.trace)
+            _writeTestBench(tbfile, intf, self.trace, self.tb_initcode)
             tbfile.close()
 
         # build portmap for cosimulation
@@ -422,7 +424,7 @@ def _writeModuleFooter(f):
     print("endmodule", file=f)
 
 
-def _writeTestBench(f, intf, trace=False):
+def _writeTestBench(f, intf, trace=False, initcode=False):
     print("module tb_%s;" % intf.name, file=f)
     print(file=f)
     fr = StringIO()
@@ -440,6 +442,8 @@ def _writeTestBench(f, intf, trace=False):
         print("    .%s(%s)," % (portname, portname), file=pm)
     print(file=f)
     print("initial begin", file=f)
+    if initcode:
+        print(initcode, file=f)
     if trace:
         print('    $dumpfile("%s.vcd");' % intf.name, file=f)
         print('    $dumpvars(0, dut);', file=f)
