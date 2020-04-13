@@ -47,9 +47,7 @@ static PLI_INT32 delay_callback(p_cb_data cb_data);
 static PLI_INT32 delta_callback(p_cb_data cb_data);
 static PLI_INT32 change_callback(p_cb_data cb_data);
 
-static int init_pipes();
-
-static myhdl_time64_t timestruct_to_time(const struct t_vpi_time*ts);
+static int init_pipes(void);
 
 /* from Icarus */
 static myhdl_time64_t timestruct_to_time(const struct t_vpi_time*ts)
@@ -60,8 +58,9 @@ static myhdl_time64_t timestruct_to_time(const struct t_vpi_time*ts)
       return ti;
 }
 
-static int init_pipes()
+static int init_pipes(void)
 {
+  // Internal func called at startup to initialize pipe
   char *w;
   char *r;
 
@@ -89,6 +88,7 @@ static int init_pipes()
 
 static PLI_INT32 from_myhdl_calltf(PLI_BYTE8 *user_data)
 {
+  // Called by simulator on initial's $from_myhdl
   vpiHandle reg_iter, reg_handle;
   s_vpi_time verilog_time_s;
   char buf[MAXLINE];
@@ -132,8 +132,10 @@ static PLI_INT32 from_myhdl_calltf(PLI_BYTE8 *user_data)
     sprintf(s, "%d ", vpi_get(vpiSize, reg_handle));
     strcat(buf, s);
   }
+  // write: FROM 0 <sig0name> <sig0size> <sig1name> <sig1size>...
   n = write(wpipe, buf, strlen(buf));
 
+  // read: OK
   if ((n = read(rpipe, buf, MAXLINE)) == 0) {
     vpi_printf("Info: MyHDL simulator down\n");
     vpi_control(vpiFinish, 1);  /* abort simulation */
@@ -147,6 +149,7 @@ static PLI_INT32 from_myhdl_calltf(PLI_BYTE8 *user_data)
 
 static PLI_INT32 to_myhdl_calltf(PLI_BYTE8 *user_data)
 {
+  // Called by simulator on initial's $to_myhdl
   vpiHandle net_iter, net_handle;
   char buf[MAXLINE];
   char s[MAXWIDTH];
@@ -156,7 +159,7 @@ static PLI_INT32 to_myhdl_calltf(PLI_BYTE8 *user_data)
   s_cb_data cb_data_s;
   s_vpi_time verilog_time_s;
   s_vpi_time time_s;
-  s_vpi_value value_s;
+  //s_vpi_value value_s;
   static int to_myhdl_flag = 0;
 
   if (to_myhdl_flag) {
@@ -176,12 +179,13 @@ static PLI_INT32 to_myhdl_calltf(PLI_BYTE8 *user_data)
     vpi_control(vpiFinish, 1);  /* abort simulation */
     return(0);
   }
+
   sprintf(buf, "TO 0 ");
   pli_time = 0;
   delta = 0;
 
   time_s.type = vpiSuppressTime;
-  value_s.format = vpiSuppressVal;
+  //value_s.format = vpiSuppressVal;
   cb_data_s.reason = cbValueChange;
   cb_data_s.cb_rtn = change_callback;
   cb_data_s.time = &time_s;
@@ -208,8 +212,10 @@ static PLI_INT32 to_myhdl_calltf(PLI_BYTE8 *user_data)
     vpi_register_cb(&cb_data_s);
     i++;
   }
+  // write: TO 0 <sig0name> <sig0size> <sig1name> <sig1size>...
   n = write(wpipe, buf, strlen(buf));
 
+  // read: OK
   if ((n = read(rpipe, buf, MAXLINE)) == 0) {
     vpi_printf("ABORT from $to_myhdl\n");
     vpi_control(vpiFinish, 1);  /* abort simulation */
@@ -249,6 +255,7 @@ static PLI_INT32 to_myhdl_calltf(PLI_BYTE8 *user_data)
 
 static PLI_INT32 readonly_callback(p_cb_data cb_data)
 {
+  // Called by simulator on registered cbReadOnlySynch
   vpiHandle net_iter, net_handle;
   s_cb_data cb_data_s;
   s_vpi_time verilog_time_s;
@@ -264,8 +271,10 @@ static PLI_INT32 readonly_callback(p_cb_data cb_data)
 
   if (start_flag) {
     start_flag = 0;
+    // write: START
     n = write(wpipe, "START", 5);  
     // vpi_printf("INFO: RO cb at start-up\n");
+    // read: OK
     if ((n = read(rpipe, buf, MAXLINE)) == 0) {
       vpi_printf("ABORT from RO cb at start-up\n");
       vpi_control(vpiFinish, 1);  /* abort simulation */
@@ -299,7 +308,9 @@ static PLI_INT32 readonly_callback(p_cb_data cb_data)
     }
     i++;
   }
+  // write: <timehi> <timelo> <veriloghi> <veriloglo> <sig0name> <sig0hexval>...
   n = write(wpipe, buf, strlen(buf));
+  // read: <myhdl_time> [<sig0value> <sig1value>...]
   if ((n = read(rpipe, buf, MAXLINE)) == 0) {
     // vpi_printf("ABORT from RO cb\n");
     vpi_control(vpiFinish, 1);  /* abort simulation */
@@ -314,10 +325,10 @@ static PLI_INT32 readonly_callback(p_cb_data cb_data)
   myhdl_time_string = strtok(buf, " ");
   myhdl_time = (myhdl_time64_t) strtoull(myhdl_time_string, (char **) NULL, 10);
   delay = (myhdl_time - pli_time) * 1000;
-  assert(delay >= 0);
+  //assert(delay >= 0);
   assert(delay <= 0xFFFFFFFF);
   if (delay > 0) { // schedule cbAfterDelay callback
-    assert(delay > delta);
+    assert((int)delay > delta);
     delay -= delta;
     /* Icarus 20030518 runs RO callbacks when time has already advanced */
     /* Therefore, one had to compensate for the prescheduled delta callback */
@@ -347,6 +358,7 @@ static PLI_INT32 readonly_callback(p_cb_data cb_data)
 
 static PLI_INT32 delay_callback(p_cb_data cb_data)
 {
+  // Called by simulator on registered cbAfterDelay
   s_vpi_time time_s;
   s_cb_data cb_data_s;
 
@@ -441,8 +453,10 @@ static PLI_INT32 change_callback(p_cb_data cb_data)
 
 
 
-void myhdl_register()
+void myhdl_register(void)
 {
+  // Called by simulator at startup via entry in vlog_startup_routines
+  // table in myhdl_table.c
   s_vpi_systf_data tf_data;
 
   tf_data.type      = vpiSysTask;

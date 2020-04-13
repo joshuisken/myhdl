@@ -1,11 +1,14 @@
+IVVP ?= iverilog-vpi
+
 all: myhdl.vpi
 
-myhdl.vpi: myhdl.c myhdl_table.c 
-	iverilog-vpi myhdl.c myhdl_table.c
+myhdl.vpi: myhdl.c myhdl_table.c
+	$(IVVP) myhdl.c myhdl_table.c
 
 .PHONY: test
 test: myhdl.vpi
 	cd test && python test_all.py
 
 clean:
-	-rm *.o *.vpi
+	-rm myhdl.vpi $(wildcard *.o *~)
+
